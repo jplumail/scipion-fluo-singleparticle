@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["spfluo"]
+
+[project]
+name = "scipion-em-spfluo"
+readme =  "README.rst"
+dependencies = [
+    "scipion-pyworkflow",
+    "numpy",
+    "scipy",
+    "aicsimageio",
+]
+version = "0.1"
+authors = [
+  { name="Jean Plumail", email="jplumail@unistra.fr" },
+]
+description = "Scipion plugin spfluo."
+requires-python = ">=3.7"
+keywords = ["scipion", "cryoem", "imageprocessing", "scipion-3.0"]
+
+[project.urls]
+Homepage = "https://github.com/jplumail/scipion-em-spfluo"
+
+[project.optional-dependencies]
+dev = ["pre-commit", "black"]
+
+[project.entry-points."pyworkflow.plugin"]
+spfluo = "spfluo"
