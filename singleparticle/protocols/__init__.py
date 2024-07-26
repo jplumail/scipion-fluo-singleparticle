@@ -15,6 +15,9 @@ from singleparticle.protocols.protocol_deconv import (
 from singleparticle.protocols.protocol_extract_particles import (
     ProtSingleParticleExtractParticles,
 )
+from singleparticle.protocols.protocol_manual_ab_initio import (
+    ProtSingleParticleManualAbInitio,
+)
 from singleparticle.protocols.protocol_picking import ProtSingleParticlePickingNapari
 from singleparticle.protocols.protocol_picking_predict import (
     ProtSingleParticlePickingPredict,
@@ -47,4 +50,5 @@ __all__ = [
     ProtSingleParticleReconstruction,
     ProtSingleParticleSelectSubset,
     ProtSingleParticleDeconvSet,
+    ProtSingleParticleManualAbInitio,
 ]

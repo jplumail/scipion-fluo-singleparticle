@@ -1,14 +1,16 @@
 import multiprocessing as mp
 import os
+import sys
 import threading
 from tkinter import Toplevel
 from typing import TYPE_CHECKING, List, Tuple, Union
 
 import napari
 from napari.layers import Image
+from napari_spfluo import ManualAbInitioWidget
 from napari_spfluo._utils_widgets import FilterSetWidget
 from pwfluo import objects as pwfluoobj
-from pwfluo.objects import FluoImage, SetOfCoordinates3D
+from pwfluo.objects import FluoImage, Particle, PSFModel, SetOfCoordinates3D
 from pwfluo.protocols import ProtFluoBase
 from pyworkflow.gui.dialog import ToolbarListDialog
 from pyworkflow.gui.tree import TreeProvider
@@ -95,12 +97,14 @@ class NapariSetOfParticlesWidget(Toplevel):
             self.transient(master)
 
         self.queue = mp.Queue(maxsize=particles.getSize())
+        print(f"{__name__=}")
         self.process = mp.Process(
             target=self.lanchNapariForParticles,
             daemon=True,
             args=(particles, self.queue),
         )
         self.process.start()
+        print("yooooo")
 
     def lanchNapariForParticles(
         self, particles: pwfluoobj.SetOfParticles, queue: mp.Queue
@@ -334,3 +338,106 @@ class SetOfCoordinates3DDialog(ToolbarListDialog):
         vs_xy, vs_z = im.getVoxelSize()
         args += ["--scale", str(vs_z), str(vs_xy), str(vs_xy)]
         runJob(None, program, args, env=Plugin.getEnviron())
+
+
+# Stupid view
+
+
+class NapariManualAbInitioWidget(Toplevel):
+    def __init__(
+        self,
+        side_particle: Particle,
+        top_particle: Particle,
+        psf: PSFModel,
+        channel: int,
+        master=None,
+    ):
+        super().__init__(master)
+        self.withdraw()
+        if self.winfo_viewable():
+            self.transient(master)
+
+        self.queue = mp.Queue(maxsize=1)
+        print(f"{__name__}")
+        self.process = mp.Process(
+            target=self._launch_napari,
+            daemon=True,
+            args=(side_particle, top_particle, psf, channel, self.queue),
+        )
+        print("starting process")
+        self.process.start()
+        print("kill!")
+        # self.process.kill()
+        print("yooooooooo")
+        # stuff I want to execute
+
+    def _launch_napari(
+        self,
+        side_particle: Particle,
+        top_particle: Particle,
+        psf: PSFModel,
+        channel: int,
+        queue: mp.Queue,
+    ):
+        viewer = napari.Viewer()
+        # _, widget = viewer.window.add_plugin_dock_widget("napari-spfluo", "Manual ab initio reconstruction")
+
+        side_data, side_pixel_size = (
+            side_particle.getData()[channel],
+            side_particle.getVoxelSize(),
+        )
+        top_data, top_pixel_size = (
+            top_particle.getData()[channel],
+            top_particle.getVoxelSize(),
+        )
+        psf_data, psf_pixel_size = psf.getData()[channel], psf.getVoxelSize()
+
+        pixel_size_to_scale = lambda ps_xy, ps_z: (ps_z, ps_xy, ps_xy)
+
+        side_layer = viewer.add_image(
+            side_data, name="side", scale=pixel_size_to_scale(*side_pixel_size)
+        )
+        top_layer = viewer.add_image(
+            top_data,
+            name="top",
+            visible=False,
+            scale=pixel_size_to_scale(*top_pixel_size),
+        )
+        psf_layer = viewer.add_image(
+            psf_data,
+            name="psf",
+            visible=False,
+            scale=pixel_size_to_scale(*psf_pixel_size),
+        )
+        widget = ManualAbInitioWidget(viewer, top_layer, side_layer, psf_layer)
+        viewer.window.add_dock_widget(widget)
+        print(f"{id(viewer)=}", viewer.layers, file=sys.stderr)
+        # widget._reconstruction_layer.events.set_data.connect(lambda: )
+
+        napari.run()
+
+        queue.put(
+            {
+                "data": widget._reconstruction_layer.data,
+                "scale": widget._reconstruction_layer.scale,
+            }
+        )
+
+
+class ManualAbInitioView(View):
+    def __init__(
+        self,
+        side_particle: Particle,
+        top_particle: Particle,
+        psf: PSFModel,
+        channel: int,
+    ):
+        self.side_particle = side_particle
+        self.top_particle = top_particle
+        self.psf = psf
+        self.channel = channel
+
+    def show(self):
+        return NapariManualAbInitioWidget(
+            self.side_particle, self.top_particle, self.psf, self.channel
+        )
